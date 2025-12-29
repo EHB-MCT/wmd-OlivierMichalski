@@ -42,16 +42,21 @@ async function identify(uid) {
 }
 
 async function startSession(uid) {
+  if (!Number.isInteger(currentTextId)) {
+    throw new Error("No text loaded");
+  }
+
   const res = await fetch("/api/session/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ uid, textId: 1 })
+    body: JSON.stringify({ uid, textId: currentTextId })
   });
 
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to start session");
   return data.sessionId;
 }
+
 
 document.getElementById("startSession").addEventListener("click", async () => {
   try {
@@ -62,3 +67,15 @@ document.getElementById("startSession").addEventListener("click", async () => {
   }
 });
 
+let currentTextId = null;
+
+async function loadNextText(uid) {
+  const res = await fetch(`/api/text/next?uid=${encodeURIComponent(uid)}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to load text");
+
+  currentTextId = data.textId;
+  document.getElementById("currentText").textContent = data.text;
+}
+
+loadNextText(uid);

@@ -8,10 +8,14 @@ CREATE TABLE IF NOT EXISTS texts (
   text TEXT NOT NULL
 );
 
-INSERT INTO texts (text) VALUES
-('She was sad to hear that fireflies are disappearing.'),
-('A quick brown fox jumps over a lazy dog.')
-ON CONFLICT DO NOTHING;
+INSERT INTO texts (id, text) VALUES
+(1, 'She was sad to hear that fireflies are disappearing.'),
+(2, 'A quick brown fox jumps over a lazy dog.'),
+(3, 'Fifty five fish flutter fast in the fresh water.'),
+(4, 'I fixed five files before lunch finished.'),
+(5, 'Typing tests train focus and finger flow.')
+ON CONFLICT (id) DO NOTHING;
+
 
 CREATE TABLE IF NOT EXISTS sessions (
   id BIGSERIAL PRIMARY KEY,
@@ -22,3 +26,4 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_uid ON sessions(uid);
+

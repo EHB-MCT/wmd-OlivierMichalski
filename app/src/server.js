@@ -66,3 +66,29 @@ app.post("/api/session/start", async (req, res) => {
     return res.status(500).json({ error: "DB error" });
   }
 });
+
+app.get("/api/text/next", async (req, res) => {
+  const uid = req.query.uid;
+
+  if (typeof uid !== "string" || uid.length < 5 || uid.length > 80) {
+    return res.status(400).json({ error: "Invalid uid" });
+  }
+
+  try {
+    await db.query(
+      "INSERT INTO users (uid) VALUES ($1) ON CONFLICT (uid) DO NOTHING",
+      [uid]
+    );
+
+    // random text !!!! CHANGE LATER !!!!
+    const result = await db.query(
+      "SELECT id, text FROM texts ORDER BY random() LIMIT 1"
+    );
+
+    return res.json({ textId: result.rows[0].id, text: result.rows[0].text });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "DB error" });
+  }
+});
+
