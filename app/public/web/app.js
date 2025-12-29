@@ -58,6 +58,7 @@ document.getElementById("startSession").addEventListener("click", async () => {
     const sessionId = await startSession(uid);
     document.getElementById("session").textContent = sessionId;
   } catch (e) {
-    document.getElementById("session").textContent = "error";
+    document.getElementById("session").textContent = e.message;
   }
 });
+
