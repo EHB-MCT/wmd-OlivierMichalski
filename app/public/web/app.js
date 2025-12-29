@@ -1,3 +1,8 @@
+let currentSessionId = null;
+let lastKeyTime = null;
+let events = [];
+
+
 function generateUid() {
   return `u_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
@@ -58,10 +63,15 @@ async function startSession(uid) {
 }
 
 
+
 document.getElementById("startSession").addEventListener("click", async () => {
   try {
     const sessionId = await startSession(uid);
     document.getElementById("session").textContent = sessionId;
+    currentSessionId = sessionId;
+  events = [];
+  lastKeyTime = null;
+  document.getElementById("eventCount").textContent = "0";
   } catch (e) {
     document.getElementById("session").textContent = e.message;
   }
@@ -79,3 +89,32 @@ async function loadNextText(uid) {
 }
 
 loadNextText(uid);
+
+const input = document.getElementById("typingInput");
+
+input.addEventListener("keydown", (e) => {
+  if (!currentSessionId) return;
+
+  const now = Date.now();
+  const deltaMs = lastKeyTime === null ? 0 : now - lastKeyTime;
+  lastKeyTime = now;
+
+  const isBackspace = e.key === "Backspace";
+
+  const isChar = e.key.length === 1;
+
+  if (!isChar && !isBackspace) return;
+
+  //simple will be updated later
+  const idx = input.value.length;
+
+  events.push({
+    idx,
+    typed: isBackspace ? null : e.key,
+    deltaMs,
+    isBackspace
+  });
+
+  document.getElementById("eventCount").textContent = String(events.length);
+});
+
