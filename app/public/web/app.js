@@ -40,3 +40,24 @@ async function identify(uid) {
     body: JSON.stringify({ uid })
   });
 }
+
+async function startSession(uid) {
+  const res = await fetch("/api/session/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uid, textId: 1 })
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to start session");
+  return data.sessionId;
+}
+
+document.getElementById("startSession").addEventListener("click", async () => {
+  try {
+    const sessionId = await startSession(uid);
+    document.getElementById("session").textContent = sessionId;
+  } catch (e) {
+    document.getElementById("session").textContent = "error";
+  }
+});
