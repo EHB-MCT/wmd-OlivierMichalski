@@ -28,6 +28,15 @@ document.getElementById("regen").addEventListener("click", () => {
   const newUid = generateUid();
   localStorage.setItem("uid", newUid);
   setUidText(newUid);
+  identify(uid);
 });
 
 checkHealth();
+
+async function identify(uid) {
+  await fetch("/api/user/identify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uid })
+  });
+}
