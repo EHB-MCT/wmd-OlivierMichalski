@@ -27,16 +27,22 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_uid ON sessions(uid);
 
-CREATE TABLE IF NOT EXISTS events (
+CREATE TABLE IF NOT EXISTS sessions (
   id BIGSERIAL PRIMARY KEY,
-  session_id BIGINT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  idx INT NOT NULL,
-  expected CHAR(1) NOT NULL,
-  typed CHAR(1),
-  delta_ms INT NOT NULL,
-  is_backspace BOOLEAN NOT NULL,
-  is_correct BOOLEAN NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  uid TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+  text_id INT NOT NULL REFERENCES texts(id) ON DELETE RESTRICT,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ended_at TIMESTAMPTZ,
+
+  wpm NUMERIC,
+  accuracy NUMERIC,
+  total_chars INT,
+  correct_chars INT,
+  wrong_chars INT,
+  backspaces INT,
+  avg_delta_ms INT,
+  pause_rate NUMERIC
 );
+
 
 CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);

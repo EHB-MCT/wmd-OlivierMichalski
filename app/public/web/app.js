@@ -155,8 +155,32 @@ if (buffer.length >= 25) {
     document.getElementById("syncStatus").textContent = err.message;
   });
 }
-
-
   document.getElementById("eventCount").textContent = String(events.length);
 });
+
+async function finishSession(uid) {
+  if (!currentSessionId) throw new Error("No active session");
+
+  await flushEvents(uid);
+
+  const res = await fetch(`/api/session/${currentSessionId}/finish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uid })
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to finish session");
+  return data;
+}
+
+document.getElementById("finishSession").addEventListener("click", async () => {
+  try {
+    const data = await finishSession(uid);
+    document.getElementById("result").textContent = `WPM ${data.wpm} | Acc ${data.accuracy}% | Backspaces ${data.backspaces}`;
+  } catch (e) {
+    document.getElementById("result").textContent = e.message;
+  }
+});
+
 
