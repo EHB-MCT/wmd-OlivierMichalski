@@ -47,6 +47,7 @@ async function identify(uid) {
 }
 
 async function startSession(uid) {
+
   if (!Number.isInteger(currentTextId)) {
     throw new Error("No text loaded");
   }
@@ -59,7 +60,10 @@ async function startSession(uid) {
 
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to start session");
-  return data.sessionId;
+  
+  const sessionId = Number.parseInt(data.sessionId, 10);
+  if (!Number.isInteger(sessionId)) throw new Error("Bad sessionId from server");
+  return sessionId;
 }
 
 
@@ -69,6 +73,9 @@ document.getElementById("startSession").addEventListener("click", async () => {
     const sessionId = await startSession(uid);
     document.getElementById("session").textContent = sessionId;
     currentSessionId = sessionId;
+    buffer = [];
+    document.getElementById("syncStatus").textContent = "-";
+
   events = [];
   lastKeyTime = null;
   document.getElementById("eventCount").textContent = "0";
@@ -76,6 +83,27 @@ document.getElementById("startSession").addEventListener("click", async () => {
     document.getElementById("session").textContent = e.message;
   }
 });
+
+let buffer = [];
+
+async function flushEvents(uid) {
+  if (!currentSessionId) return;
+  if (buffer.length === 0) return;
+
+  const payload = buffer;
+  buffer = [];
+
+  const res = await fetch("/api/events/batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uid, sessionId: currentSessionId, events: payload })
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to sync");
+
+  document.getElementById("syncStatus").textContent = `stored ${data.stored}, dropped ${data.dropped}`;
+}
 
 let currentTextId = null;
 
@@ -114,6 +142,20 @@ input.addEventListener("keydown", (e) => {
     deltaMs,
     isBackspace
   });
+  
+  buffer.push({
+  idx,
+  typed: isBackspace ? null : e.key,
+  deltaMs,
+  isBackspace
+});
+
+if (buffer.length >= 25) {
+  flushEvents(uid).catch((err) => {
+    document.getElementById("syncStatus").textContent = err.message;
+  });
+}
+
 
   document.getElementById("eventCount").textContent = String(events.length);
 });

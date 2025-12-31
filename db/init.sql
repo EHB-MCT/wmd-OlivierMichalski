@@ -27,3 +27,16 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_uid ON sessions(uid);
 
+CREATE TABLE IF NOT EXISTS events (
+  id BIGSERIAL PRIMARY KEY,
+  session_id BIGINT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  idx INT NOT NULL,
+  expected CHAR(1) NOT NULL,
+  typed CHAR(1),
+  delta_ms INT NOT NULL,
+  is_backspace BOOLEAN NOT NULL,
+  is_correct BOOLEAN NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
