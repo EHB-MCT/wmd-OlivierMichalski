@@ -44,5 +44,13 @@ CREATE TABLE IF NOT EXISTS sessions (
   pause_rate NUMERIC
 );
 
+CREATE TABLE IF NOT EXISTS profiles (
+  uid TEXT PRIMARY KEY REFERENCES users(uid) ON DELETE CASCADE,
+  avg_wpm NUMERIC NOT NULL DEFAULT 0,
+  avg_accuracy NUMERIC NOT NULL DEFAULT 0,
+  weak_bigrams JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 
 CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);

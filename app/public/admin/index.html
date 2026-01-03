@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Admin Dashboard</h1>
+
+      <section class="card">
+        <label>Admin password</label>
+        <input id="pw" type="password" placeholder="ADMIN_PASSWORD" />
+        <button id="loadUsers">Load users</button>
+        <p id="adminStatus">-</p>
+      </section>
+
+      <section class="card">
+        <h2>Users</h2>
+        <select id="userSelect"></select>
+      </section>
+
+      <section class="card">
+        <h2>WPM over time</h2>
+        <canvas id="wpmChart"></canvas>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="./admin.js"></script>
+  </body>
+</html>

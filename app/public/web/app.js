@@ -28,12 +28,16 @@ async function checkHealth() {
 
 const uid = getOrCreateUid();
 setUidText(uid);
+identify(uid);
 
-document.getElementById("regen").addEventListener("click", () => {
-  const newUid = generateUid();
-  localStorage.setItem("uid", newUid);
-  setUidText(newUid);
-  identify(uid);
+document.getElementById("regen").addEventListener("click", async () => {
+  uid = generateUid();
+  localStorage.setItem("uid", uid);
+  setUidText(uid);
+  await identify(uid);
+  await loadNextText(uid);
+  currentSessionId = null;
+  document.getElementById("session").textContent = "none";
 });
 
 checkHealth();
@@ -177,7 +181,13 @@ async function finishSession(uid) {
 document.getElementById("finishSession").addEventListener("click", async () => {
   try {
     const data = await finishSession(uid);
-    document.getElementById("result").textContent = `WPM ${data.wpm} | Acc ${data.accuracy}% | Backspaces ${data.backspaces}`;
+    document.getElementById("result").textContent =
+  `WPM ${data.wpm} | Acc ${data.accuracy}% | Backspaces ${data.backspaces}`;
+
+if (Array.isArray(data.weakBigramsTop)) {
+  document.getElementById("weakBigrams").textContent =
+    data.weakBigramsTop.map(x => `${x.bg}:${x.errors}`).join("  ");
+}
   } catch (e) {
     document.getElementById("result").textContent = e.message;
   }

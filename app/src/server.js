@@ -12,11 +12,67 @@ app.get("/api/health", (req, res) => {
 app.use(express.json());
 app.use("/", express.static(path.join(__dirname, "..", "public", "web")));
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+
 
 const db = require("./db");
+
+function requireAdmin(req, res, next) {
+  const token = req.headers["x-admin-password"];
+  if (!token || token !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
+}
+
+app.get("/api/admin/users", requireAdmin, async (req, res) => {
+  try {
+    const result = await db.query(
+      `
+      SELECT
+        u.uid,
+        MAX(s.started_at) AS last_seen,
+        COUNT(s.id) AS sessions
+      FROM users u
+      LEFT JOIN sessions s ON s.uid = u.uid
+      GROUP BY u.uid
+      ORDER BY last_seen DESC NULLS LAST
+      LIMIT 100
+      `
+    );
+    return res.json({ users: result.rows });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "DB error" });
+  }
+});
+
+app.get("/api/admin/users/:uid/sessions", requireAdmin, async (req, res) => {
+  const uid = req.params.uid;
+
+  if (typeof uid !== "string" || uid.length < 5 || uid.length > 80) {
+    return res.status(400).json({ error: "Invalid uid" });
+  }
+
+  try {
+    const result = await db.query(
+      `
+      SELECT id, started_at, ended_at, wpm, accuracy, backspaces
+      FROM sessions
+      WHERE uid = $1 AND ended_at IS NOT NULL
+      ORDER BY started_at ASC
+      LIMIT 200
+      `,
+      [uid]
+    );
+    return res.json({ sessions: result.rows });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "DB error" });
+  }
+});
+
+app.use("/admin", express.static(path.join(__dirname, "..", "public", "admin")));
+
 
 app.post("/api/user/identify", async (req, res) => {
   const { uid } = req.body;
@@ -75,17 +131,48 @@ app.get("/api/text/next", async (req, res) => {
   }
 
   try {
-    await db.query(
-      "INSERT INTO users (uid) VALUES ($1) ON CONFLICT (uid) DO NOTHING",
-      [uid]
-    );
+   await db.query(
+  "INSERT INTO users (uid) VALUES ($1) ON CONFLICT (uid) DO NOTHING",
+  [uid]
+);
 
-    // random text !!!! CHANGE LATER !!!!
-    const result = await db.query(
-      "SELECT id, text FROM texts ORDER BY random() LIMIT 1"
-    );
+const pr = await db.query("SELECT weak_bigrams FROM profiles WHERE uid = $1", [uid]);
+let weak = pr.rowCount ? pr.rows[0].weak_bigrams : {};
+if (typeof weak === "string") {
+  try { weak = JSON.parse(weak); } catch { weak = {}; }
+}
+if (!weak || typeof weak !== "object") weak = {};
 
-    return res.json({ textId: result.rows[0].id, text: result.rows[0].text });
+const all = await db.query("SELECT id, text FROM texts");
+if (all.rowCount === 0) return res.status(500).json({ error: "No texts" });
+
+function bigramSet(str) {
+  const s = String(str || "").toLowerCase();
+  const set = new Set();
+  for (let i = 0; i < s.length - 1; i++) set.add(s[i] + s[i + 1]);
+  return set;
+}
+
+const scored = all.rows.map((t) => {
+  const set = bigramSet(t.text);
+  let score = 0;
+  for (const [bg, count] of Object.entries(weak)) {
+    if (set.has(bg)) score += Number(count);
+  }
+  return { id: t.id, text: t.text, score };
+});
+
+scored.sort((a, b) => b.score - a.score);
+
+let pick;
+if (scored[0].score === 0) {
+  pick = scored[Math.floor(Math.random() * scored.length)];
+} else {
+  const topN = scored.slice(0, Math.min(3, scored.length));
+  pick = topN[Math.floor(Math.random() * topN.length)];
+}
+
+return res.json({ textId: pick.id, text: pick.text });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "DB error" });
@@ -235,6 +322,66 @@ app.post("/api/session/:id/finish", async (req, res) => {
       [sessionId, wpm, accuracy, totalChars, correctChars, wrongChars, backspaces, avgDeltaMs, pauseRate]
     );
 
+    const tx = await db.query(
+  "SELECT t.text FROM sessions s JOIN texts t ON t.id = s.text_id WHERE s.id = $1",
+  [sessionId]
+);
+const text = tx.rows[0]?.text || "";
+
+const wrong = await db.query(
+  "SELECT idx FROM events WHERE session_id = $1 AND is_backspace = false AND is_correct = false",
+  [sessionId]
+);
+
+const sessionBigramCounts = {};
+for (const r of wrong.rows) {
+  const idx = Number.parseInt(r.idx, 10);
+  if (!Number.isInteger(idx) || idx <= 0 || idx >= text.length) continue;
+  const bg = (text[idx - 1] + text[idx]).toLowerCase();
+  sessionBigramCounts[bg] = (sessionBigramCounts[bg] || 0) + 1;
+}
+
+const av = await db.query(
+  "SELECT AVG(wpm) AS avg_wpm, AVG(accuracy) AS avg_accuracy FROM sessions WHERE uid = $1 AND ended_at IS NOT NULL",
+  [uid]
+);
+
+const avgWpm = av.rows[0]?.avg_wpm ? Number(av.rows[0].avg_wpm) : 0;
+const avgAcc = av.rows[0]?.avg_accuracy ? Number(av.rows[0].avg_accuracy) : 0;
+
+const pr = await db.query("SELECT weak_bigrams FROM profiles WHERE uid = $1", [uid]);
+let existing = pr.rowCount ? pr.rows[0].weak_bigrams : {};
+if (typeof existing === "string") {
+  try { existing = JSON.parse(existing); } catch { existing = {}; }
+}
+if (!existing || typeof existing !== "object") existing = {};
+
+const merged = { ...existing };
+for (const [bg, count] of Object.entries(sessionBigramCounts)) {
+  const prev = Number(merged[bg] || 0);
+  merged[bg] = prev + Number(count);
+}
+
+await db.query(
+  `
+  INSERT INTO profiles (uid, avg_wpm, avg_accuracy, weak_bigrams, updated_at)
+  VALUES ($1, $2, $3, $4::jsonb, NOW())
+  ON CONFLICT (uid)
+  DO UPDATE SET
+    avg_wpm = EXCLUDED.avg_wpm,
+    avg_accuracy = EXCLUDED.avg_accuracy,
+    weak_bigrams = EXCLUDED.weak_bigrams,
+    updated_at = NOW()
+  `,
+  [uid, avgWpm, avgAcc, JSON.stringify(merged)]
+);
+
+const weakBigramsTop = Object.entries(merged)
+  .sort((a, b) => Number(b[1]) - Number(a[1]))
+  .slice(0, 5)
+  .map(([bg, errors]) => ({ bg, errors: Number(errors) }));
+
+
     return res.json({
       wpm: Number(wpm.toFixed(1)),
       accuracy: Number(accuracy.toFixed(1)),
@@ -243,7 +390,8 @@ app.post("/api/session/:id/finish", async (req, res) => {
       wrongChars,
       backspaces,
       avgDeltaMs,
-      pauseRate: Number(pauseRate.toFixed(1))
+      pauseRate: Number(pauseRate.toFixed(1)),
+      weakBigramsTop
     });
   } catch (err) {
     console.error(err);
@@ -251,3 +399,6 @@ app.post("/api/session/:id/finish", async (req, res) => {
   }
 });
 
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
