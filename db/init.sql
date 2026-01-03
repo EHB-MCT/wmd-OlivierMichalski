@@ -54,3 +54,13 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 
 CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
+
+CREATE TABLE IF NOT EXISTS accounts (
+  id BIGSERIAL PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  uid TEXT NOT NULL UNIQUE REFERENCES users(uid) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_accounts_uid ON accounts(uid);

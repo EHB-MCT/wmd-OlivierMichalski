@@ -3,6 +3,7 @@ const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const bcrypt = require("bcryptjs");
 
 // API
 app.get("/api/health", (req, res) => {
@@ -92,6 +93,99 @@ app.post("/api/user/identify", async (req, res) => {
     return res.status(500).json({ error: "DB error" });
   }
 });
+
+function isValidUsername(username) {
+  return typeof username === "string"
+    && username.length >= 3
+    && username.length <= 24
+    && /^[a-zA-Z0-9_]+$/.test(username);
+}
+
+function isValidPassword(password) {
+  return typeof password === "string" && password.length >= 6 && password.length <= 72;
+}
+
+function generateUid() {
+  return `u_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+app.post("/api/auth/register", async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!isValidUsername(username)) {
+    return res.status(400).json({ error: "Invalid username" });
+  }
+  if (!isValidPassword(password)) {
+    return res.status(400).json({ error: "Invalid password" });
+  }
+
+  const uid = generateUid();
+
+  try {
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    await db.query("BEGIN");
+
+    await db.query(
+      "INSERT INTO users (uid) VALUES ($1) ON CONFLICT (uid) DO NOTHING",
+      [uid]
+    );
+
+    await db.query(
+      "INSERT INTO accounts (username, password_hash, uid) VALUES ($1, $2, $3)",
+      [username, passwordHash, uid]
+    );
+
+    await db.query("COMMIT");
+
+    return res.json({ ok: true, uid });
+  } catch (err) {
+    await db.query("ROLLBACK");
+
+    // unique violation (username already exists / uid unique)
+    if (err && err.code === "23505") {
+      return res.status(409).json({ error: "Username already exists" });
+    }
+
+    console.error(err);
+    return res.status(500).json({ error: "DB error" });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!isValidUsername(username)) {
+    return res.status(400).json({ error: "Invalid username" });
+  }
+  if (!isValidPassword(password)) {
+    return res.status(400).json({ error: "Invalid password" });
+  }
+
+  try {
+    const result = await db.query(
+      "SELECT uid, password_hash FROM accounts WHERE username = $1",
+      [username]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const row = result.rows[0];
+    const ok = await bcrypt.compare(password, row.password_hash);
+
+    if (!ok) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    return res.json({ ok: true, uid: row.uid });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "DB error" });
+  }
+});
+
 
 app.post("/api/session/start", async (req, res) => {
   const { uid, textId } = req.body;

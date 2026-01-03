@@ -26,12 +26,31 @@ async function checkHealth() {
   document.getElementById("status").textContent = data.ok ? "ok" : "not ok";
 }
 
-const uid = getOrCreateUid();
+let uid = getOrCreateUid();
 setUidText(uid);
 identify(uid);
 
+async function applyUid(newUid) {
+  uid = newUid;
+  localStorage.setItem("uid", uid);
+
+  setUidText(uid);
+  await identify(uid);
+  await loadNextText(uid);
+
+  currentSessionId = null;
+  buffer = [];
+  events = [];
+  lastKeyTime = null;
+
+  document.getElementById("session").textContent = "none";
+  document.getElementById("eventCount").textContent = "0";
+  document.getElementById("syncStatus").textContent = "-";
+  document.getElementById("result").textContent = "-";
+}
+
 document.getElementById("regen").addEventListener("click", async () => {
-  uid = generateUid();
+  await applyUid(generateUid());
   localStorage.setItem("uid", uid);
   setUidText(uid);
   await identify(uid);
@@ -193,4 +212,47 @@ if (Array.isArray(data.weakBigramsTop)) {
   }
 });
 
+async function authRequest(path) {
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
 
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password })
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Auth failed");
+  return data.uid;
+}
+
+document.getElementById("registerBtn").addEventListener("click", async () => {
+  const el = document.getElementById("authStatus");
+  try {
+    el.textContent = "registering...";
+    const newUid = await authRequest("/api/auth/register");
+    await applyUid(newUid);
+    el.textContent = "registered + logged in";
+  } catch (e) {
+    el.textContent = e.message;
+  }
+});
+
+document.getElementById("loginBtn").addEventListener("click", async () => {
+  const el = document.getElementById("authStatus");
+  try {
+    el.textContent = "logging in...";
+    const newUid = await authRequest("/api/auth/login");
+    await applyUid(newUid);
+    el.textContent = "logged in";
+  } catch (e) {
+    el.textContent = e.message;
+  }
+});
+
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  const el = document.getElementById("authStatus");
+  await applyUid(generateUid());
+  el.textContent = "logged out (new anonymous uid)";
+});
