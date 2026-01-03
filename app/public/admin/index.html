@@ -19,6 +19,7 @@
 
       <section class="card">
         <h2>Users</h2>
+        <input id="userFilter" type="text" placeholder="filter by username or uid..." />
         <select id="userSelect"></select>
       </section>
 
@@ -27,6 +28,12 @@
         <canvas id="wpmChart"></canvas>
       </section>
     </main>
+
+    <section class="card">
+  <h2>Top weak bigrams (errors)</h2>
+  <canvas id="bigramChart"></canvas>
+</section>
+
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="./admin.js"></script>

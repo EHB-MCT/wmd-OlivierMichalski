@@ -28,18 +28,21 @@ function requireAdmin(req, res, next) {
 app.get("/api/admin/users", requireAdmin, async (req, res) => {
   try {
     const result = await db.query(
-      `
-      SELECT
-        u.uid,
-        MAX(s.started_at) AS last_seen,
-        COUNT(s.id) AS sessions
-      FROM users u
-      LEFT JOIN sessions s ON s.uid = u.uid
-      GROUP BY u.uid
-      ORDER BY last_seen DESC NULLS LAST
-      LIMIT 100
-      `
-    );
+  `
+  SELECT
+    u.uid,
+    a.username,
+    MAX(s.started_at) AS last_seen,
+    COUNT(s.id) AS sessions
+  FROM users u
+  LEFT JOIN accounts a ON a.uid = u.uid
+  LEFT JOIN sessions s ON s.uid = u.uid
+  GROUP BY u.uid, a.username
+  ORDER BY last_seen DESC NULLS LAST
+  LIMIT 200
+  `
+);
+
     return res.json({ users: result.rows });
   } catch (err) {
     console.error(err);
@@ -73,6 +76,54 @@ app.get("/api/admin/users/:uid/sessions", requireAdmin, async (req, res) => {
 });
 
 app.use("/admin", express.static(path.join(__dirname, "..", "public", "admin")));
+
+app.get("/api/admin/users/:uid/profile", requireAdmin, async (req, res) => {
+  const uid = req.params.uid;
+
+  if (typeof uid !== "string" || uid.length < 5 || uid.length > 80) {
+    return res.status(400).json({ error: "Invalid uid" });
+  }
+
+  try {
+    const result = await db.query(
+      `
+      SELECT p.uid, p.avg_wpm, p.avg_accuracy, p.weak_bigrams, a.username
+      FROM profiles p
+      LEFT JOIN accounts a ON a.uid = p.uid
+      WHERE p.uid = $1
+      `,
+      [uid]
+    );
+
+    if (result.rowCount === 0) {
+      return res.json({ uid, username: null, avg_wpm: 0, avg_accuracy: 0, weakBigramsTop: [] });
+    }
+
+    const row = result.rows[0];
+
+    let weak = row.weak_bigrams || {};
+    if (typeof weak === "string") {
+      try { weak = JSON.parse(weak); } catch { weak = {}; }
+    }
+    if (!weak || typeof weak !== "object") weak = {};
+
+    const weakBigramsTop = Object.entries(weak)
+      .sort((a, b) => Number(b[1]) - Number(a[1]))
+      .slice(0, 12)
+      .map(([bg, errors]) => ({ bg, errors: Number(errors) }));
+
+    return res.json({
+      uid: row.uid,
+      username: row.username || null,
+      avg_wpm: Number(row.avg_wpm || 0),
+      avg_accuracy: Number(row.avg_accuracy || 0),
+      weakBigramsTop
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "DB error" });
+  }
+});
 
 
 app.post("/api/user/identify", async (req, res) => {
