@@ -439,8 +439,15 @@ app.get("/api/text/next", async (req, res) => {
       if (strength >= 60 && strength <= 80 && stress === false) return "normal";
       return "custom";
     }
-
-    const mode = modeFromConfig(personalizationStrength, stressMode);
+    
+    let mode = modeFromConfig(personalizationStrength, stressMode);
+    let modeSource = "admin";
+    
+    const reqMode = String(req.query.mode || "").toLowerCase();
+    if (reqMode === "easy" || reqMode === "normal" || reqMode === "hard") {
+      mode = reqMode;
+      modeSource = "user";
+}
 
     const pr = await db.query("SELECT weak_bigrams FROM profiles WHERE uid = $1", [uid]);
     let weak = pr.rowCount ? pr.rows[0].weak_bigrams : {};
@@ -547,6 +554,7 @@ app.get("/api/text/next", async (req, res) => {
       text: pick.text,
       meta: {
         mode,
+        modeSource,
         used,
         personalizationStrength,
         stressMode,
@@ -763,18 +771,43 @@ const weakBigramsTop = Object.entries(merged)
   .slice(0, 5)
   .map(([bg, errors]) => ({ bg, errors: Number(errors) }));
 
+  // --- NEW: top weak letters for this session (expected letters that were mistyped)
+const wrongLetters = await db.query(
+  `
+  SELECT expected
+  FROM events
+  WHERE session_id = $1
+    AND is_backspace = false
+    AND is_correct = false
+  `,
+  [sessionId]
+);
 
-    return res.json({
-      wpm: Number(wpm.toFixed(1)),
-      accuracy: Number(accuracy.toFixed(1)),
-      totalChars,
-      correctChars,
-      wrongChars,
-      backspaces,
-      avgDeltaMs,
-      pauseRate: Number(pauseRate.toFixed(1)),
-      weakBigramsTop
-    });
+const letterCounts = {};
+for (const r of wrongLetters.rows) {
+  const ch = String(r.expected || "").toLowerCase();
+  if (!/^[a-z]$/.test(ch)) continue; // letters only
+  letterCounts[ch] = (letterCounts[ch] || 0) + 1;
+}
+
+const weakLettersTop = Object.entries(letterCounts)
+  .sort((a, b) => Number(b[1]) - Number(a[1]))
+  .slice(0, 8)
+  .map(([ch, errors]) => ({ ch, errors: Number(errors) }));
+  
+  return res.json({
+  wpm: Number(wpm.toFixed(1)),
+  accuracy: Number(accuracy.toFixed(1)),
+  totalChars,
+  correctChars,
+  wrongChars,
+  backspaces,
+  avgDeltaMs,
+  pauseRate: Number(pauseRate.toFixed(1)),
+  weakBigramsTop,
+  weakLettersTop
+});
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "DB error" });

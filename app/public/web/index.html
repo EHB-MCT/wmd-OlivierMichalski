@@ -47,6 +47,13 @@
 
 <section class="card">
   <p><strong>Selection:</strong> <span id="selectionMeta">-</span></p>
+  <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+  <button id="userModeAuto" type="button">Auto</button>
+  <button id="userModeEasy" type="button">Easy</button>
+  <button id="userModeNormal" type="button">Normal</button>
+  <button id="userModeHard" type="button">Hard</button>
+  <span style="opacity:.8;">Selected: <strong><span id="userModeLabel">auto</span></strong></span>
+</div>
   <p><strong>Current text:</strong></p>
   <p id="currentText">loading...</p>
 </section>
@@ -68,8 +75,7 @@
 <section class="card">
   <button id="finishSession">Finish session</button>
   <p><strong>Result:</strong> <span id="result">-</span></p>
-  <p><strong>Weak bigrams:</strong> <span id="weakBigrams">-</span></p>
-  <p><strong>Recommended focus:</strong> <span id="focusBigrams">-</span></p>
+  <p><strong>Weak letters:</strong> <span id="weakLetters">-</span></p>
 </section>
 
     <script src="./app.js"></script>

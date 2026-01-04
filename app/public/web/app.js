@@ -4,6 +4,15 @@ let buffer = [];
 let currentTextId = null;
 let currentTargetText = "";
 
+let userMode = localStorage.getItem("userMode") || "auto";
+
+function setUserMode(m) {
+  userMode = m;
+  localStorage.setItem("userMode", m);
+  setText("userModeLabel", m);
+  loadNextText(uid).catch((e) => setText("result", e.message));
+}
+
 
 function el(id) {
   return document.getElementById(id);
@@ -124,7 +133,11 @@ async function checkHealth() {
 }
 
 async function loadNextText(uid) {
-  const res = await fetch(`/api/text/next?uid=${encodeURIComponent(uid)}`);
+  let url = `/api/text/next?uid=${encodeURIComponent(uid)}`;
+if (userMode && userMode !== "auto") {
+  url += `&mode=${encodeURIComponent(userMode)}`;
+}
+const res = await fetch(url);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to load text");
 
@@ -140,7 +153,7 @@ async function loadNextText(uid) {
     ? m.matchesTop.map(x => `${x.bg}(${x.weight})`).join(", ")
     : "none";
 
-  const meta = `mode=${m.mode} | used=${m.used} | strength=${m.personalizationStrength} | stress=${m.stressMode} | score=${m.profileScore} | matches=${matches}`;
+  const meta = `mode=${m.mode}${m.modeSource ? `(${m.modeSource})` : ""} | used=${m.used} | strength=${m.personalizationStrength} | stress=${m.stressMode} | score=${m.profileScore} | matches=${matches}`;
   setText("selectionMeta", meta);
 }
   return data;
@@ -256,7 +269,13 @@ function setLoggedOut() {
 
 syncAuthUi();
 checkHealth();
+setText("userModeLabel", userMode);
 applyUid(uid).catch((e) => setText("result", e.message));
+
+el("userModeAuto")?.addEventListener("click", () => setUserMode("auto"));
+el("userModeEasy")?.addEventListener("click", () => setUserMode("easy"));
+el("userModeNormal")?.addEventListener("click", () => setUserMode("normal"));
+el("userModeHard")?.addEventListener("click", () => setUserMode("hard"));
 
 el("typeBox")?.addEventListener("click", () => {
   el("typingInput")?.focus();
@@ -355,10 +374,10 @@ el("finishSession")?.addEventListener("click", async () => {
 
     setText("result", `WPM ${data.wpm} | Acc ${data.accuracy}% | Backspaces ${data.backspaces}`);
 
-    if (Array.isArray(data.weakBigramsTop)) {
-      setText("weakBigrams", data.weakBigramsTop.map(x => `${x.bg}:${x.errors}`).join("  "));
-      setText("focusBigrams", data.weakBigramsTop.map(x => x.bg).join(", "));
-    }
+    if (Array.isArray(data.weakLettersTop)) {
+  setText("weakLetters", data.weakLettersTop.map(x => `${x.ch}:${x.errors}`).join("  "));
+}
+
 
     const input = document.getElementById("typingInput");
 if (input) input.disabled = true;
