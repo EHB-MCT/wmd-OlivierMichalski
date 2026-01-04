@@ -464,53 +464,88 @@ app.get("/api/text/next", async (req, res) => {
   }
 
   const scored = all.rows.map((t) => {
-    const set = bigramSet(t.text);
-    let profileScore = 0;
+  const set = bigramSet(t.text);
 
-    for (const [bg, count] of Object.entries(weak)) {
-      if (set.has(bg)) profileScore += Number(count);
+  let profileScore = 0;
+  const matches = [];
+
+  for (const [bg, count] of Object.entries(weak)) {
+    if (set.has(bg)) {
+      const n = Number(count) || 0;
+      profileScore += n;
+      matches.push({ bg, weight: n });
     }
+  }
 
-    const stressBonus = stressMode ? (String(t.text).length / 20) : 0;
+  matches.sort((a, b) => b.weight - a.weight);
 
-    return {
-      id: t.id,
-      text: t.text,
-      profileScore,
-      totalScore: profileScore + stressBonus,
-      length: String(t.text).length
-    };
-  });
+  const stressBonus = stressMode ? (String(t.text).length / 20) : 0;
+
+  return {
+    id: t.id,
+    text: t.text,
+    profileScore,
+    stressBonus,
+    totalScore: profileScore + stressBonus,
+    length: String(t.text).length,
+    matchesTop: matches.slice(0, 3) 
+  };
+});
+
 
   function pickRandom() {
-    if (!stressMode) {
-      return scored[Math.floor(Math.random() * scored.length)];
-    }
-    const byLen = [...scored].sort((a, b) => b.length - a.length);
-    const topN = byLen.slice(0, Math.min(3, byLen.length));
-    return topN[Math.floor(Math.random() * topN.length)];
+  return scored[Math.floor(Math.random() * scored.length)];
+}
+
+function pickWeightedStrong() {
+  // Prefer texts with some score. If none scored, fallback random.
+  const byScore = [...scored].sort((a, b) => b.totalScore - a.totalScore);
+  if (byScore[0].totalScore <= 0) return pickRandom();
+
+  // Weighted roulette over the top 10 (more stable than top3 random)
+  const top = byScore.slice(0, Math.min(10, byScore.length));
+  const total = top.reduce((sum, t) => sum + Math.max(0, t.totalScore), 0);
+
+  let r = Math.random() * total;
+  for (const t of top) {
+    r -= Math.max(0, t.totalScore);
+    if (r <= 0) return t;
   }
+  return top[0];
+}
 
-  function pickWeighted() {
-    const byScore = [...scored].sort((a, b) => b.totalScore - a.totalScore);
-    if (byScore[0].totalScore <= 0) return pickRandom();
-    const topN = byScore.slice(0, Math.min(3, byScore.length));
-    return topN[Math.floor(Math.random() * topN.length)];
-  }
+// Easy mode = mostly random. Normal/Hard = mostly weighted.
+const mode =
+  personalizationStrength <= 30 && !stressMode ? "easy" :
+  personalizationStrength >= 90 && stressMode ? "hard" :
+  "normal";
 
-  const useWeighted = Math.random() < (Math.max(0, Math.min(100, personalizationStrength)) / 100);
+let pick;
+let used;
 
-  const pick = useWeighted ? pickWeighted() : pickRandom();
+if (mode === "easy") {
+  pick = pickRandom();
+  used = "random";
+} else {
+  const p = Math.max(0, Math.min(100, personalizationStrength)) / 100;
+  const useWeighted = Math.random() < p;
+  pick = useWeighted ? pickWeightedStrong() : pickRandom();
+  used = useWeighted ? "weighted" : "random";
+}
 
   return res.json({
-    textId: pick.id,
-    text: pick.text,
-    meta: {
-      used: useWeighted ? "weighted" : "random",
-      personalizationStrength,
-      stressMode
-    }
-  });
+  textId: pick.id,
+  text: pick.text,
+  meta: {
+    mode,
+    used,
+    personalizationStrength,
+    stressMode,
+    profileScore: Number(pick.profileScore || 0),
+    matchesTop: pick.matchesTop || []
+  }
+});
+
 } catch (err) {
   console.error(err);
   return res.status(500).json({ error: "DB error" });
