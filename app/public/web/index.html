@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Super Type Trainer</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Super Type Trainer</h1>
+
+      <section class="card" id="profileAnon">
+      <p><strong>Profile:</strong> not logged in</p>
+      <p>Login to keep your stats and see your profile.</p>
+    </section>
+    
+    <section class="card" id="profileCard" style="display:none">
+      <p><strong>Your profile:</strong> <span id="uid">...</span></p>
+      <button id="regen">Reload profile</button>
+    </section>
+
+      <section class="card">
+          <h2>Login</h2>
+          <label>Username</label>
+          <input id="username" type="text" placeholder="olive" />
+          <label>Password</label>
+            <input id="password" type="password" placeholder="pass123" />
+        <div style="margin-top: 10px;">
+          <button id="registerBtn">Register</button>
+          <button id="loginBtn">Login</button>
+       <button id="logoutBtn" style="display:none">Logout</button>
+      </div>
+      <a id="profileLink" href="/profile.html" style="display:none">My Profile</a>
+      <p id="authStatus">-</p>
+  </section>
+
+      <section class="card">
+        <p>Status: <span id="status">loading...</span></p>
+      </section>
+    </main>
+    
+    <section class="card">
+  <p><strong>Session:</strong> <span id="session">none</span></p>
+  <button id="startSession">Start session</button>
+</section>
+
+<section class="card">
+  <p><strong>Current text:</strong></p>
+  <p id="currentText">loading...</p>
+</section>
+
+<section class="card">
+  <p><strong>Type here:</strong></p>
+  <input id="typingInput" type="text" autocomplete="off" spellcheck="false" />
+  <p>Events logged: <span id="eventCount">0</span></p>
+  <p>Last sync: <span id="syncStatus">-</span></p>
+</section>
+
+<section class="card">
+  <button id="finishSession">Finish session</button>
+  <p><strong>Result:</strong> <span id="result">-</span></p>
+  <p><strong>Weak bigrams:</strong> <span id="weakBigrams">-</span></p>
+</section>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Profile</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>My Profile</h1>
+
+      <section class="card">
+        <p>User: <strong><span id="who">-</span></strong></p>
+        <p>Mode: <strong><span id="mode">-</span></strong></p>
+        <p>Average: <strong><span id="avg">-</span></strong></p>
+      </section>
+
+      <section class="card">
+        <h2>WPM over time</h2>
+        <canvas id="wpmChart"></canvas>
+      </section>
+
+      <section class="card">
+        <h2>Accuracy over time</h2>
+        <canvas id="accChart"></canvas>
+      </section>
+
+      <section class="card">
+        <h2>Top weak bigrams</h2>
+        <canvas id="bigramChart"></canvas>
+      </section>
+
+      <section class="card">
+        <a href="/">Back</a>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="./profile.js"></script>
+  </body>
+</html>
