@@ -13,9 +13,9 @@ function adminFetch(url, pw, opts = {}) {
 }
 
 function modeFromConfig(strength, stress) {
-  if (strength <= 30 && stress === false) return "easy";
-  if (strength >= 90 && stress === true) return "hard";
-  if (strength >= 60 && strength <= 80 && stress === false) return "normal";
+  if (strength === 0 && stress === false) return "easy";
+  if (strength === 85 && stress === false) return "normal";
+  if (strength === 100 && stress === true) return "hard";
   return "custom";
 }
 
@@ -34,14 +34,15 @@ async function loadConfig(pw) {
 }
 
 async function setMode(pw, mode) {
-  let personalization_strength = 70;
+ 
+  let personalization_strength = 85;
   let stress_mode = false;
 
   if (mode === "easy") {
-    personalization_strength = 25;
+    personalization_strength = 0;
     stress_mode = false;
   } else if (mode === "normal") {
-    personalization_strength = 70;
+    personalization_strength = 85;
     stress_mode = false;
   } else if (mode === "hard") {
     personalization_strength = 100;

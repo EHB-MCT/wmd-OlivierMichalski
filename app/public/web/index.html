@@ -9,6 +9,7 @@
   <body>
     <main class="wrap">
       <h1>Super Type Trainer</h1>
+      <a id="profileLink" href="admin/index.html" style="display:none">Admin Page</a>
 
       <section class="card" id="profileAnon">
       <p><strong>Profile:</strong> not logged in</p>
@@ -17,7 +18,7 @@
     
     <section class="card" id="profileCard" style="display:none">
       <p><strong>Your profile:</strong> <span id="uid">...</span></p>
-      <button id="regen">Reload profile</button>
+      <button id="regen">Refresh profile</button>
     </section>
 
       <section class="card">
@@ -38,7 +39,6 @@
       <section class="card">
         <p>Status: <span id="status">loading...</span></p>
       </section>
-    </main>
     
     <section class="card">
   <p><strong>Session:</strong> <span id="session">none</span></p>
@@ -53,10 +53,17 @@
 
 <section class="card">
   <p><strong>Type here:</strong></p>
-  <input id="typingInput" type="text" autocomplete="off" spellcheck="false" />
-   <p>Events logged: <span id="eventCount">0</span></p>
+
+  <div id="typeBox" class="typeBox">
+    <div id="targetOverlay" class="typeLayer typeTarget"></div>
+    <div id="typedOverlay" class="typeLayer typeTyped" aria-hidden="true"></div>
+    <input id="typingInput" class="typeInput" type="text" autocomplete="off" spellcheck="false" />
+  </div>
+
+  <p>Events logged: <span id="eventCount">0</span></p>
   <p>Last sync: <span id="syncStatus">-</span></p>
 </section>
+
 
 <section class="card">
   <button id="finishSession">Finish session</button>
@@ -66,5 +73,6 @@
 </section>
 
     <script src="./app.js"></script>
+        </main>
   </body>
 </html>

@@ -13,62 +13,56 @@
       <section class="card">
         <label>Admin password</label>
         <input id="pw" type="password" placeholder="ADMIN_PASSWORD" />
-        <button id="loadUsers">Load users</button>
-        <p id="adminStatus">-</p>
+        <div class="row" style="margin-top: 10px;">
+          <button id="loadUsers">Load users</button>
+          <span class="kpi">Status: <span id="adminStatus">-</span></span>
+        </div>
       </section>
 
       <section class="card">
-  <h2>Mode</h2>
-  <p>Current: <strong><span id="modeLabel">-</span></strong></p>
+        <h2>Mode</h2>
+        <p>Current: <strong><span id="modeLabel">-</span></strong></p>
 
-  <button id="modeEasy">Easy</button>
-  <button id="modeNormal">Normal</button>
-  <button id="modeHard">Hard</button>
-
-  <p id="modeStatus">-</p>
-</section>
-
-
-
-      <section class="card">
-  <h2>Users</h2>
-  <input id="userFilter" type="text" placeholder="filter by username or uid..." />
-  <select id="userSelect"></select>
-  <button id="deleteUser">Delete selected user</button>
-  <p id="deleteStatus">-</p>
-</section>
-
-
-      <section class="card">
-        <h2>WPM over time</h2>
-        <canvas id="wpmChart"></canvas>
+        <div class="row" style="margin-top: 10px;">
+          <button id="modeEasy">Easy</button>
+          <button id="modeNormal">Normal</button>
+          <button id="modeHard">Hard</button>
+          <span class="kpi">Mode status: <span id="modeStatus">-</span></span>
+        </div>
       </section>
 
       <section class="card">
-  <h2>Accuracy over time</h2>
-  <canvas id="accChart"></canvas>
-</section>
+        <h2>Users</h2>
+        <label>Filter</label>
+        <input id="userFilter" type="text" placeholder="filter by username or uid..." />
 
-<section class="card">
-  <h2>Top weak bigrams (errors)</h2>
-  <canvas id="bigramChart"></canvas>
-</section>
+        <label>Select user</label>
+        <select id="userSelect"></select>
 
+        <div class="row" style="margin-top: 10px;">
+          <button id="deleteUser">Delete selected user</button>
+          <span class="kpi">Delete: <span id="deleteStatus">-</span></span>
+        </div>
+      </section>
 
-    
+      <div class="grid2">
+        <section class="card">
+          <h2>WPM over time</h2>
+          <canvas id="wpmChart"></canvas>
+        </section>
 
-    <section class="card">
-  <h2>Accuracy over time</h2>
-  <canvas id="accChart"></canvas>
-</section>
+        <section class="card">
+          <h2>Accuracy over time</h2>
+          <canvas id="accChart"></canvas>
+        </section>
+      </div>
 
+      <section class="card">
+        <h2>Top weak bigrams (errors)</h2>
+        <canvas id="bigramChart"></canvas>
+      </section>
+    </main>
 
-    <section class="card">
-  <h2>Top weak bigrams (errors)</h2>
-  <canvas id="bigramChart"></canvas>
-</section>
-
-</main>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="./admin.js"></script>
   </body>

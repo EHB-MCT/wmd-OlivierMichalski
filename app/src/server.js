@@ -338,22 +338,7 @@ app.delete("/api/admin/users/:uid", requireAdmin, async (req, res) => {
   }
 });
 
-app.delete("/api/admin/users/:uid", requireAdmin, async (req, res) => {
-  const uid = req.params.uid;
 
-  if (typeof uid !== "string" || uid.length < 5 || uid.length > 80) {
-    return res.status(400).json({ error: "Invalid uid" });
-  }
-
-  try {
-    const r = await db.query("DELETE FROM users WHERE uid = $1 RETURNING uid", [uid]);
-    if (r.rowCount === 0) return res.status(404).json({ error: "User not found" });
-    return res.json({ ok: true });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "DB error" });
-  }
-});
 
 
 app.post("/api/auth/login", async (req, res) => {
@@ -429,128 +414,152 @@ app.get("/api/text/next", async (req, res) => {
   }
 
   try {
-  await db.query(
-    "INSERT INTO users (uid) VALUES ($1) ON CONFLICT (uid) DO NOTHING",
-    [uid]
-  );
+    await db.query(
+      "INSERT INTO users (uid) VALUES ($1) ON CONFLICT (uid) DO NOTHING",
+      [uid]
+    );
 
-  const cfg = await db.query(
-    "SELECT personalization_strength, stress_mode FROM admin_config WHERE id = 1"
-  );
+    await db.query("INSERT INTO admin_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING");
 
-  let personalizationStrength = 70;
-  let stressMode = false;
+    const cfg = await db.query(
+      "SELECT personalization_strength, stress_mode FROM admin_config WHERE id = 1"
+    );
 
-  if (cfg.rowCount > 0) {
-    personalizationStrength = Number(cfg.rows[0].personalization_strength);
-    stressMode = Boolean(cfg.rows[0].stress_mode);
-  }
+    let personalizationStrength = 70;
+    let stressMode = false;
 
-  const pr = await db.query("SELECT weak_bigrams FROM profiles WHERE uid = $1", [uid]);
-  let weak = pr.rowCount ? pr.rows[0].weak_bigrams : {};
-  if (typeof weak === "string") {
-    try { weak = JSON.parse(weak); } catch { weak = {}; }
-  }
-  if (!weak || typeof weak !== "object") weak = {};
-
-  const all = await db.query("SELECT id, text FROM texts");
-  if (all.rowCount === 0) return res.status(500).json({ error: "No texts" });
-
-  function bigramSet(str) {
-    const s = String(str || "").toLowerCase();
-    const set = new Set();
-    for (let i = 0; i < s.length - 1; i++) set.add(s[i] + s[i + 1]);
-    return set;
-  }
-
-  const scored = all.rows.map((t) => {
-  const set = bigramSet(t.text);
-
-  let profileScore = 0;
-  const matches = [];
-
-  for (const [bg, count] of Object.entries(weak)) {
-    if (set.has(bg)) {
-      const n = Number(count) || 0;
-      profileScore += n;
-      matches.push({ bg, weight: n });
+    if (cfg.rowCount > 0) {
+      personalizationStrength = Number(cfg.rows[0].personalization_strength);
+      stressMode = Boolean(cfg.rows[0].stress_mode);
     }
+
+    function modeFromConfig(strength, stress) {
+      if (strength <= 30 && stress === false) return "easy";
+      if (strength >= 90 && stress === true) return "hard";
+      if (strength >= 60 && strength <= 80 && stress === false) return "normal";
+      return "custom";
+    }
+
+    const mode = modeFromConfig(personalizationStrength, stressMode);
+
+    const pr = await db.query("SELECT weak_bigrams FROM profiles WHERE uid = $1", [uid]);
+    let weak = pr.rowCount ? pr.rows[0].weak_bigrams : {};
+
+    if (typeof weak === "string") {
+      try { weak = JSON.parse(weak); } catch { weak = {}; }
+    }
+    if (!weak || typeof weak !== "object") weak = {};
+
+    const all = await db.query("SELECT id, text FROM texts");
+    if (all.rowCount === 0) return res.status(500).json({ error: "No texts" });
+
+    function bigramSet(str) {
+      const s = String(str || "").toLowerCase();
+      const set = new Set();
+      for (let i = 0; i < s.length - 1; i++) set.add(s[i] + s[i + 1]);
+      return set;
+    }
+
+    const scored = all.rows.map((t) => {
+      const set = bigramSet(t.text);
+
+      let profileScore = 0;
+      for (const [bg, count] of Object.entries(weak)) {
+        if (set.has(bg)) profileScore += Number(count);
+      }
+
+      const stressBonus = stressMode ? (String(t.text).length / 20) : 0;
+
+      return {
+        id: t.id,
+        text: t.text,
+        profileScore,
+        totalScore: profileScore + stressBonus,
+        length: String(t.text).length,
+        set
+      };
+    });
+
+
+        const maxProfileScore = scored.reduce((m, x) => Math.max(m, x.profileScore), 0);
+    const hasProfileSignal = Object.keys(weak).length > 0 && maxProfileScore > 0;
+
+    const strength01 = Math.max(0, Math.min(100, Number(personalizationStrength))) / 100;
+
+    function pickFromPool(items) {
+      return items[Math.floor(Math.random() * items.length)];
+    }
+
+    function pickShortPool() {
+      const byLen = [...scored].sort((a, b) => a.length - b.length);
+      return byLen.slice(0, Math.min(10, byLen.length));
+    }
+
+    function pickLongPool() {
+      const byLen = [...scored].sort((a, b) => b.length - a.length);
+      return byLen.slice(0, Math.min(10, byLen.length));
+    }
+
+    function weightedPick(items, weightFn) {
+      const weights = items.map((it) => Math.max(0, Number(weightFn(it) || 0)));
+      const sum = weights.reduce((a, b) => a + b, 0);
+
+      if (sum <= 0) return pickFromPool(items);
+
+      let r = Math.random() * sum;
+      for (let i = 0; i < items.length; i++) {
+        r -= weights[i];
+        if (r <= 0) return items[i];
+      }
+      return items[items.length - 1];
+    }
+
+    let pool = scored;
+    if (mode === "easy") pool = pickShortPool();
+    if (mode === "hard") pool = pickLongPool();
+
+    let used = "random";
+    let pick = pickFromPool(pool);
+
+    const canPersonalize = hasProfileSignal && mode !== "easy";
+
+    if (mode === "hard" && canPersonalize) {
+      used = "weighted";
+      const sorted = [...pool].sort((a, b) => b.totalScore - a.totalScore).slice(0, Math.min(10, pool.length));
+      pick = weightedPick(sorted, (t) => t.totalScore);
+    } else if (canPersonalize && Math.random() < strength01) {
+      used = "weighted";
+      const sorted = [...pool].sort((a, b) => b.totalScore - a.totalScore).slice(0, Math.min(10, pool.length));
+      pick = weightedPick(sorted, (t) => t.totalScore);
+    } else {
+      used = "random";
+      pick = pickFromPool(pool);
+    }
+
+    const matchesTop = Object.entries(weak)
+      .filter(([bg, count]) => pick.set && pick.set.has(bg) && Number(count) > 0)
+      .sort((a, b) => Number(b[1]) - Number(a[1]))
+      .slice(0, 8)
+      .map(([bg, weight]) => ({ bg, weight: Number(weight) }));
+
+    return res.json({
+      textId: pick.id,
+      text: pick.text,
+      meta: {
+        mode,
+        used,
+        personalizationStrength,
+        stressMode,
+        profileScore: Number(pick.profileScore || 0),
+        matchesTop
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "DB error" });
   }
-
-  matches.sort((a, b) => b.weight - a.weight);
-
-  const stressBonus = stressMode ? (String(t.text).length / 20) : 0;
-
-  return {
-    id: t.id,
-    text: t.text,
-    profileScore,
-    stressBonus,
-    totalScore: profileScore + stressBonus,
-    length: String(t.text).length,
-    matchesTop: matches.slice(0, 3) 
-  };
 });
 
-
-  function pickRandom() {
-  return scored[Math.floor(Math.random() * scored.length)];
-}
-
-function pickWeightedStrong() {
-  // Prefer texts with some score. If none scored, fallback random.
-  const byScore = [...scored].sort((a, b) => b.totalScore - a.totalScore);
-  if (byScore[0].totalScore <= 0) return pickRandom();
-
-  // Weighted roulette over the top 10 (more stable than top3 random)
-  const top = byScore.slice(0, Math.min(10, byScore.length));
-  const total = top.reduce((sum, t) => sum + Math.max(0, t.totalScore), 0);
-
-  let r = Math.random() * total;
-  for (const t of top) {
-    r -= Math.max(0, t.totalScore);
-    if (r <= 0) return t;
-  }
-  return top[0];
-}
-
-// Easy mode = mostly random. Normal/Hard = mostly weighted.
-const mode =
-  personalizationStrength <= 30 && !stressMode ? "easy" :
-  personalizationStrength >= 90 && stressMode ? "hard" :
-  "normal";
-
-let pick;
-let used;
-
-if (mode === "easy") {
-  pick = pickRandom();
-  used = "random";
-} else {
-  const p = Math.max(0, Math.min(100, personalizationStrength)) / 100;
-  const useWeighted = Math.random() < p;
-  pick = useWeighted ? pickWeightedStrong() : pickRandom();
-  used = useWeighted ? "weighted" : "random";
-}
-
-  return res.json({
-  textId: pick.id,
-  text: pick.text,
-  meta: {
-    mode,
-    used,
-    personalizationStrength,
-    stressMode,
-    profileScore: Number(pick.profileScore || 0),
-    matchesTop: pick.matchesTop || []
-  }
-});
-
-} catch (err) {
-  console.error(err);
-  return res.status(500).json({ error: "DB error" });
-}
-});
 
 app.post("/api/events/batch", async (req, res) => {
   const { uid, events } = req.body;

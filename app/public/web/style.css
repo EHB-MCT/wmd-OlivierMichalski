@@ -1,19 +1,217 @@
-body {
-  font-family: system-ui, Arial, sans-serif;
-  margin: 0;
-  padding: 24px;
-  background: #f6f6f6;
+:root {
+  --bg0: #0b0f16;
+  --bg1: #0f1624;
+  --card: rgba(255, 255, 255, 0.06);
+  --card2: rgba(255, 255, 255, 0.09);
+  --border: rgba(255, 255, 255, 0.12);
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.65);
+  --muted2: rgba(255, 255, 255, 0.42);
+  --accent: #43ff7a;
+  --danger: #ff5f6a;
+
+  --radius: 16px;
+  --shadow: 0 14px 40px rgba(0,0,0,0.35);
 }
 
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  color: var(--text);
+  background:
+    radial-gradient(900px 500px at 20% 10%, rgba(67,255,122,0.10), transparent 60%),
+    radial-gradient(800px 500px at 80% 30%, rgba(80,150,255,0.10), transparent 60%),
+    linear-gradient(180deg, var(--bg0), var(--bg1));
+  font: 15px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+a {
+  color: var(--text);
+  text-decoration: none;
+  opacity: 0.9;
+}
+a:hover { opacity: 1; text-decoration: underline; }
+
 .wrap {
-  max-width: 720px;
-  margin: 0 auto;
+  width: min(980px, calc(100% - 32px));
+  margin: 28px auto 60px;
+  display: grid;
+  gap: 14px;
+}
+
+h1 {
+  margin: 0 0 4px;
+  letter-spacing: -0.02em;
+  font-size: 28px;
 }
 
 .card {
-  background: white;
-  border-radius: 10px;
+  background: linear-gradient(180deg, var(--card), rgba(255,255,255,0.04));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
   padding: 16px;
-  margin: 12px 0;
-  border: 1px solid #ddd;
+  backdrop-filter: blur(10px);
+}
+
+.card h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+p { margin: 8px 0; color: var(--muted); }
+strong { color: var(--text); }
+
+label {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  margin: 10px 0 6px;
+}
+
+input[type="text"], input[type="password"] {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.25);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 12px 12px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input[type="text"]:focus, input[type="password"]:focus {
+  border-color: rgba(67,255,122,0.55);
+  box-shadow: 0 0 0 4px rgba(67,255,122,0.10);
+}
+
+button {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: transform 0.05s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+button:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.18);
+}
+
+button:active { transform: translateY(1px); }
+
+button#finishSession {
+  border-color: rgba(67,255,122,0.35);
+}
+button#finishSession:hover {
+  background: rgba(67,255,122,0.10);
+}
+
+button#logoutBtn {
+  border-color: rgba(255,95,106,0.35);
+}
+button#logoutBtn:hover {
+  background: rgba(255,95,106,0.10);
+}
+
+#authStatus, #syncStatus, #result, #selectionMeta {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+#status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.06);
+  color: var(--muted);
+}
+
+.card > div[style*="margin-top"] {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.card > div[style*="margin-top"] button {
+  flex: 1 1 120px;
+}
+
+
+
+.typeBox {
+  position: relative;
+  min-height: 130px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.22);
+  cursor: text;
+  overflow: hidden;
+}
+
+.typeBox.disabled { opacity: 0.55; }
+
+.typeLayer {
+  position: absolute;
+  inset: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+.typeTarget { color: rgba(255,255,255,0.30); }
+.typeTyped { color: rgba(255,255,255,0.95); }
+
+.typeTyped .ghost { color: transparent; }
+.typeTyped .ok { color: rgba(67,255,122,0.92); }
+.typeTyped .bad {
+  color: rgba(255,120,120,0.95);
+  background: rgba(255,80,80,0.18);
+  border-radius: 4px;
+}
+.typeTyped .overflow {
+  color: rgba(255,120,120,0.95);
+  background: rgba(255,80,80,0.18);
+  border-radius: 4px;
+}
+
+.typeTyped .caret {
+  display: inline-block;
+  width: 0;
+  border-left: 2px solid rgba(255,255,255,0.9);
+  margin-left: -1px;
+  height: 1.2em;
+  vertical-align: -0.2em;
+  animation: caretBlink 1s step-end infinite;
+}
+
+@keyframes caretBlink { 50% { opacity: 0; } }
+
+.typeInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  caret-color: transparent;
+}
+
+
+@media (max-width: 520px) {
+  .typeLayer { font-size: 16px; }
+  .wrap { width: calc(100% - 20px); }
 }

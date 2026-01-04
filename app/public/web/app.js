@@ -2,6 +2,8 @@ let currentSessionId = null;
 let lastKeyTime = null;
 let buffer = [];
 let currentTextId = null;
+let currentTargetText = "";
+
 
 function el(id) {
   return document.getElementById(id);
@@ -10,6 +12,73 @@ function setText(id, value) {
   const node = el(id);
   if (node) node.textContent = String(value);
 }
+
+function escHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function charHtml(ch) {
+  // keep spaces visible in overlay layout
+  if (ch === " ") return "&nbsp;";
+  if (ch === "\n") return "<br/>";
+  return escHtml(ch);
+}
+
+function setTypingEnabled(enabled) {
+  const input = el("typingInput");
+  if (input) input.disabled = !enabled;
+
+  const box = el("typeBox");
+  if (box) box.classList.toggle("disabled", !enabled);
+}
+
+function renderOverlay() {
+  const targetEl = el("targetOverlay");
+  const typedEl = el("typedOverlay");
+  const input = el("typingInput");
+
+  if (!targetEl || !typedEl || !input) return;
+
+  const target = String(currentTargetText || "");
+  const typed = String(input.value || "");
+
+  targetEl.textContent = target;
+
+  let html = "";
+
+  const n = target.length;
+  const m = typed.length;
+
+  for (let i = 0; i < n; i++) {
+    if (i === m) html += `<span class="caret"></span>`;
+
+    if (i < m) {
+      const t = typed[i];
+      const exp = target[i];
+      html += `<span class="${t === exp ? "ok" : "bad"}">${charHtml(t)}</span>`;
+    } else {
+      html += `<span class="ghost">${charHtml(target[i])}</span>`;
+    }
+  }
+
+  if (m >= n) {
+    html += `<span class="caret"></span>`;
+    const extra = typed.slice(n);
+    if (extra.length) {
+      for (const ch of extra) {
+        html += `<span class="overflow">${charHtml(ch)}</span>`;
+      }
+    }
+  }
+
+  typedEl.innerHTML = html;
+}
+
 function generateUid() {
   return `u_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
@@ -21,7 +90,7 @@ function getStoredUid() {
 }
 
 function isLoggedIn() {
-  return Boolean(localStorage.getItem("authUid")) && Boolean(localStorage.getItem("username"));
+  return Boolean(localStorage.getItem("authUid"));
 }
 
 function syncAuthUi() {
@@ -61,6 +130,9 @@ async function loadNextText(uid) {
 
   currentTextId = data.textId;
   setText("currentText", data.text);
+  currentTargetText = data.text || "";
+  renderOverlay();
+
 
  if (data.meta) {
   const m = data.meta;
@@ -186,18 +258,34 @@ syncAuthUi();
 checkHealth();
 applyUid(uid).catch((e) => setText("result", e.message));
 
+el("typeBox")?.addEventListener("click", () => {
+  el("typingInput")?.focus();
+});
+
+el("typingInput")?.addEventListener("input", () => {
+  renderOverlay();
+});
+
+
 const input = document.getElementById("typingInput");
-if (input) input.disabled = true;
+ if (input) input.disabled = true;
 
 
 el("regen")?.addEventListener("click", async () => {
   try {
-    await applyUid(generateUid());
-    setText("authStatus", "anonymous profile");
+    const authUid = localStorage.getItem("authUid");
+    if (authUid) {
+      await applyUid(authUid);
+      setText("authStatus", "refreshed logged-in profile");
+    } else {
+      await applyUid(generateUid());
+      setText("authStatus", "anonymous profile");
+    }
   } catch (e) {
     setText("authStatus", e.message);
   }
 });
+
 
 el("startSession")?.addEventListener("click", async () => {
   try {
@@ -213,6 +301,9 @@ if (input) {
 
     buffer = [];
     lastKeyTime = null;
+    setTypingEnabled(true);
+    renderOverlay();
+
 
     setText("session", sessionId);
     setText("syncStatus", "-");
@@ -224,6 +315,12 @@ if (input) {
 });
 
 el("typingInput")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+    e.preventDefault();
+    el("finishSession")?.click();
+    return;
+  }
+
   if (!currentSessionId) return;
 
   const now = Date.now();
@@ -253,6 +350,7 @@ el("typingInput")?.addEventListener("keydown", (e) => {
 
 el("finishSession")?.addEventListener("click", async () => {
   try {
+    setTypingEnabled(false);
     const data = await finishSession(uid);
 
     setText("result", `WPM ${data.wpm} | Acc ${data.accuracy}% | Backspaces ${data.backspaces}`);
@@ -267,7 +365,29 @@ if (input) input.disabled = true;
 currentSessionId = null;
 setText("session", "none");
 
-    await loadNextText(uid);
+await loadNextText(uid);
+
+const nextSessionId = await startSession(uid);
+currentSessionId = nextSessionId;
+setText("session", nextSessionId);
+
+buffer = [];
+lastKeyTime = null;
+setText("eventCount", "0");
+setText("syncStatus", "-");
+setText("weakBigrams", "-");
+
+const input2 = el("typingInput");
+if (input2) {
+  input2.value = "";
+  input2.focus();
+}
+
+setTypingEnabled(true);
+renderOverlay();
+
+
+
 
   } catch (e) {
     setText("result", e.message);
