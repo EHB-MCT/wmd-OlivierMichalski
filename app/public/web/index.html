@@ -10,24 +10,30 @@
     <main class="wrap">
       <h1>Super Type Trainer</h1>
 
-      <section class="card">
-        <p><strong>Your profile:</strong> <span id="uid">...</span></p>
-        <button id="regen">Reload profile</button>
-      </section>
+      <section class="card" id="profileAnon">
+      <p><strong>Profile:</strong> not logged in</p>
+      <p>Login to keep your stats and see your profile.</p>
+    </section>
+    
+    <section class="card" id="profileCard" style="display:none">
+      <p><strong>Your profile:</strong> <span id="uid">...</span></p>
+      <button id="regen">Reload profile</button>
+    </section>
 
       <section class="card">
           <h2>Login</h2>
-            <label>Username</label>
-              <input id="username" type="text" placeholder="olive" />
-                <label>Password</label>
-                  <input id="password" type="password" placeholder="pass123" />
-                    <div style="margin-top: 10px;">
-                          <button id="registerBtn">Register</button>
-                              <button id="loginBtn">Login</button>
-                                  <button id="logoutBtn">Logout</button>
-                                  </div>
-                                  <p id="authStatus">-</p>
-</section>
+          <label>Username</label>
+          <input id="username" type="text" placeholder="olive" />
+          <label>Password</label>
+            <input id="password" type="password" placeholder="pass123" />
+        <div style="margin-top: 10px;">
+          <button id="registerBtn">Register</button>
+          <button id="loginBtn">Login</button>
+       <button id="logoutBtn" style="display:none">Logout</button>
+      </div>
+      <a id="profileLink" href="/profile.html" style="display:none">My Profile</a>
+      <p id="authStatus">-</p>
+  </section>
 
       <section class="card">
         <p>Status: <span id="status">loading...</span></p>

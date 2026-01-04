@@ -1,7 +1,8 @@
 let currentSessionId = null;
 let lastKeyTime = null;
 let events = [];
-
+let buffer = [];
+let currentTextId = null;
 
 function generateUid() {
   return `u_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -17,7 +18,34 @@ function getOrCreateUid() {
 }
 
 function setUidText(uid) {
-  document.getElementById("uid").textContent = uid;
+  const el = document.getElementById("uid");
+  if (el) el.textContent = uid;
+}
+
+function ensureAuthFlag() {
+  if (localStorage.getItem("loggedIn") === null) {
+    localStorage.setItem("loggedIn", "0");
+  }
+}
+
+function isLoggedIn() {
+  return localStorage.getItem("loggedIn") === "1";
+}
+
+function syncAuthUi() {
+  const logged = isLoggedIn();
+
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) logoutBtn.style.display = logged ? "inline-block" : "none";
+
+  const profileCard = document.getElementById("profileCard");
+  if (profileCard) profileCard.style.display = logged ? "block" : "none";
+
+  const profileAnon = document.getElementById("profileAnon");
+  if (profileAnon) profileAnon.style.display = logged ? "none" : "block";
+
+  const profileLink = document.getElementById("profileLink");
+  if (profileLink) profileLink.style.display = logged ? "inline-block" : "none";
 }
 
 async function checkHealth() {
@@ -26,9 +54,57 @@ async function checkHealth() {
   document.getElementById("status").textContent = data.ok ? "ok" : "not ok";
 }
 
+async function identify(uid) {
+  await fetch("/api/user/identify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uid })
+  });
+}
+
+async function loadNextText(uid) {
+  const res = await fetch(`/api/text/next?uid=${encodeURIComponent(uid)}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to load text");
+
+  currentTextId = data.textId;
+  document.getElementById("currentText").textContent = data.text;
+}
+
 let uid = getOrCreateUid();
 setUidText(uid);
-identify(uid);
+
+function ensureAuthFlag() {
+  if (localStorage.getItem("loggedIn") === null) {
+    localStorage.setItem("loggedIn", "0");
+  }
+}
+
+function isLoggedIn() {
+  return localStorage.getItem("loggedIn") === "1";
+}
+
+function syncAuthUi() {
+  const logged = isLoggedIn();
+
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) logoutBtn.style.display = logged ? "inline-block" : "none";
+
+  const profileCard = document.getElementById("profileCard");
+  if (profileCard) profileCard.style.display = logged ? "block" : "none";
+
+  const profileAnon = document.getElementById("profileAnon");
+  if (profileAnon) profileAnon.style.display = logged ? "none" : "block";
+
+  const profileLink = document.getElementById("profileLink");
+  if (profileLink) profileLink.style.display = logged ? "inline-block" : "none";
+}
+
+function setAuthStatus(msg) {
+  const el = document.getElementById("authStatus");
+  if (el) el.textContent = msg;
+}
+
 
 async function applyUid(newUid) {
   uid = newUid;
@@ -47,33 +123,22 @@ async function applyUid(newUid) {
   document.getElementById("eventCount").textContent = "0";
   document.getElementById("syncStatus").textContent = "-";
   document.getElementById("result").textContent = "-";
+  document.getElementById("weakBigrams").textContent = "-";
 }
+
+ensureAuthFlag();
+syncAuthUi();
+
 
 document.getElementById("regen").addEventListener("click", async () => {
   await applyUid(generateUid());
-  localStorage.setItem("uid", uid);
-  setUidText(uid);
-  await identify(uid);
-  await loadNextText(uid);
-  currentSessionId = null;
-  document.getElementById("session").textContent = "none";
+  localStorage.setItem("loggedIn", "0");
+  syncAuthUi();
+  setAuthStatus("anonymous profile");
 });
 
-checkHealth();
-
-async function identify(uid) {
-  await fetch("/api/user/identify", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ uid })
-  });
-}
-
 async function startSession(uid) {
-
-  if (!Number.isInteger(currentTextId)) {
-    throw new Error("No text loaded");
-  }
+  if (!Number.isInteger(currentTextId)) throw new Error("No text loaded");
 
   const res = await fetch("/api/session/start", {
     method: "POST",
@@ -83,31 +148,28 @@ async function startSession(uid) {
 
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to start session");
-  
+
   const sessionId = Number.parseInt(data.sessionId, 10);
   if (!Number.isInteger(sessionId)) throw new Error("Bad sessionId from server");
   return sessionId;
 }
-
-
 
 document.getElementById("startSession").addEventListener("click", async () => {
   try {
     const sessionId = await startSession(uid);
     document.getElementById("session").textContent = sessionId;
     currentSessionId = sessionId;
-    buffer = [];
-    document.getElementById("syncStatus").textContent = "-";
 
-  events = [];
-  lastKeyTime = null;
-  document.getElementById("eventCount").textContent = "0";
+    buffer = [];
+    events = [];
+    lastKeyTime = null;
+
+    document.getElementById("syncStatus").textContent = "-";
+    document.getElementById("eventCount").textContent = "0";
   } catch (e) {
     document.getElementById("session").textContent = e.message;
   }
 });
-
-let buffer = [];
 
 async function flushEvents(uid) {
   if (!currentSessionId) return;
@@ -128,21 +190,17 @@ async function flushEvents(uid) {
   document.getElementById("syncStatus").textContent = `stored ${data.stored}, dropped ${data.dropped}`;
 }
 
-let currentTextId = null;
 
-async function loadNextText(uid) {
-  const res = await fetch(`/api/text/next?uid=${encodeURIComponent(uid)}`);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Failed to load text");
+checkHealth();
+identify(uid).catch(() => {});
+loadNextText(uid).catch((e) => {
+  document.getElementById("currentText").textContent = e.message;
+});
 
-  currentTextId = data.textId;
-  document.getElementById("currentText").textContent = data.text;
-}
-
-loadNextText(uid);
+ensureAuthFlag();
+syncAuthUi();
 
 const input = document.getElementById("typingInput");
-
 input.addEventListener("keydown", (e) => {
   if (!currentSessionId) return;
 
@@ -151,33 +209,28 @@ input.addEventListener("keydown", (e) => {
   lastKeyTime = now;
 
   const isBackspace = e.key === "Backspace";
-
   const isChar = e.key.length === 1;
 
   if (!isChar && !isBackspace) return;
 
-  //simple will be updated later
   const idx = input.value.length;
 
-  events.push({
+  const ev = {
     idx,
     typed: isBackspace ? null : e.key,
     deltaMs,
     isBackspace
-  });
-  
-  buffer.push({
-  idx,
-  typed: isBackspace ? null : e.key,
-  deltaMs,
-  isBackspace
-});
+  };
 
-if (buffer.length >= 25) {
-  flushEvents(uid).catch((err) => {
-    document.getElementById("syncStatus").textContent = err.message;
-  });
-}
+  events.push(ev);
+  buffer.push(ev);
+
+  if (buffer.length >= 25) {
+    flushEvents(uid).catch((err) => {
+      document.getElementById("syncStatus").textContent = err.message;
+    });
+  }
+
   document.getElementById("eventCount").textContent = String(events.length);
 });
 
@@ -200,13 +253,14 @@ async function finishSession(uid) {
 document.getElementById("finishSession").addEventListener("click", async () => {
   try {
     const data = await finishSession(uid);
-    document.getElementById("result").textContent =
-  `WPM ${data.wpm} | Acc ${data.accuracy}% | Backspaces ${data.backspaces}`;
 
-if (Array.isArray(data.weakBigramsTop)) {
-  document.getElementById("weakBigrams").textContent =
-    data.weakBigramsTop.map(x => `${x.bg}:${x.errors}`).join("  ");
-}
+    document.getElementById("result").textContent =
+      `WPM ${data.wpm} | Acc ${data.accuracy}% | Backspaces ${data.backspaces}`;
+
+    if (Array.isArray(data.weakBigramsTop)) {
+      document.getElementById("weakBigrams").textContent =
+        data.weakBigramsTop.map(x => `${x.bg}:${x.errors}`).join("  ");
+    }
   } catch (e) {
     document.getElementById("result").textContent = e.message;
   }
@@ -228,31 +282,41 @@ async function authRequest(path) {
 }
 
 document.getElementById("registerBtn").addEventListener("click", async () => {
-  const el = document.getElementById("authStatus");
   try {
-    el.textContent = "registering...";
+    setAuthStatus("registering...");
     const newUid = await authRequest("/api/auth/register");
     await applyUid(newUid);
-    el.textContent = "registered + logged in";
+
+    localStorage.setItem("loggedIn", "1");
+    syncAuthUi();
+
+    setAuthStatus("registered + logged in");
   } catch (e) {
-    el.textContent = e.message;
+    setAuthStatus(e.message);
   }
 });
 
 document.getElementById("loginBtn").addEventListener("click", async () => {
-  const el = document.getElementById("authStatus");
   try {
-    el.textContent = "logging in...";
+    setAuthStatus("logging in...");
     const newUid = await authRequest("/api/auth/login");
     await applyUid(newUid);
-    el.textContent = "logged in";
+
+    localStorage.setItem("loggedIn", "1");
+    syncAuthUi();
+
+    setAuthStatus("logged in");
   } catch (e) {
-    el.textContent = e.message;
+    setAuthStatus(e.message);
   }
 });
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
-  const el = document.getElementById("authStatus");
   await applyUid(generateUid());
-  el.textContent = "logged out (new anonymous uid)";
+
+  localStorage.setItem("loggedIn", "0");
+  syncAuthUi();
+
+  setAuthStatus("logged out");
 });
+

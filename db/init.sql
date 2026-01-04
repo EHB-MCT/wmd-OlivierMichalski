@@ -16,17 +16,6 @@ INSERT INTO texts (id, text) VALUES
 (5, 'Typing tests train focus and finger flow.')
 ON CONFLICT (id) DO NOTHING;
 
-
-CREATE TABLE IF NOT EXISTS sessions (
-  id BIGSERIAL PRIMARY KEY,
-  uid TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
-  text_id INT NOT NULL REFERENCES texts(id) ON DELETE RESTRICT,
-  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  ended_at TIMESTAMPTZ
-);
-
-CREATE INDEX IF NOT EXISTS idx_sessions_uid ON sessions(uid);
-
 CREATE TABLE IF NOT EXISTS sessions (
   id BIGSERIAL PRIMARY KEY,
   uid TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
@@ -44,6 +33,22 @@ CREATE TABLE IF NOT EXISTS sessions (
   pause_rate NUMERIC
 );
 
+CREATE INDEX IF NOT EXISTS idx_sessions_uid ON sessions(uid);
+
+CREATE TABLE IF NOT EXISTS events (
+  id BIGSERIAL PRIMARY KEY,
+  session_id BIGINT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  idx INT NOT NULL,
+  expected TEXT NOT NULL,
+  typed TEXT,
+  delta_ms INT NOT NULL,
+  is_backspace BOOLEAN NOT NULL,
+  is_correct BOOLEAN NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
+
 CREATE TABLE IF NOT EXISTS profiles (
   uid TEXT PRIMARY KEY REFERENCES users(uid) ON DELETE CASCADE,
   avg_wpm NUMERIC NOT NULL DEFAULT 0,
@@ -51,9 +56,6 @@ CREATE TABLE IF NOT EXISTS profiles (
   weak_bigrams JSONB NOT NULL DEFAULT '{}'::jsonb,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-
-CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
 
 CREATE TABLE IF NOT EXISTS accounts (
   id BIGSERIAL PRIMARY KEY,
@@ -64,3 +66,13 @@ CREATE TABLE IF NOT EXISTS accounts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_accounts_uid ON accounts(uid);
+
+CREATE TABLE IF NOT EXISTS admin_config (
+  id INT PRIMARY KEY,
+  personalization_strength INT NOT NULL DEFAULT 70,
+  stress_mode BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO admin_config (id) VALUES (1)
+ON CONFLICT (id) DO NOTHING;

@@ -125,6 +125,51 @@ app.get("/api/admin/users/:uid/profile", requireAdmin, async (req, res) => {
   }
 });
 
+app.get("/api/admin/config", requireAdmin, async (req, res) => {
+  try {
+    const r = await db.query(
+      "SELECT personalization_strength, stress_mode, updated_at FROM admin_config WHERE id = 1"
+    );
+
+    if (r.rowCount === 0) {
+      await db.query("INSERT INTO admin_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING");
+      return res.json({ personalization_strength: 70, stress_mode: false });
+    }
+
+    return res.json({
+      personalization_strength: Number(r.rows[0].personalization_strength),
+      stress_mode: Boolean(r.rows[0].stress_mode),
+      updated_at: r.rows[0].updated_at
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "DB error" });
+  }
+});
+
+app.post("/api/admin/config", requireAdmin, async (req, res) => {
+  const strengthRaw = req.body?.personalization_strength;
+  const stressRaw = req.body?.stress_mode;
+
+  const personalization_strength = Number.parseInt(strengthRaw, 10);
+  const stress_mode = Boolean(stressRaw);
+
+  if (!Number.isInteger(personalization_strength) || personalization_strength < 0 || personalization_strength > 100) {
+    return res.status(400).json({ error: "Invalid personalization_strength" });
+  }
+
+  try {
+    await db.query(
+      "UPDATE admin_config SET personalization_strength = $1, stress_mode = $2, updated_at = NOW() WHERE id = 1",
+      [personalization_strength, stress_mode]
+    );
+
+    return res.json({ ok: true, personalization_strength, stress_mode });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "DB error" });
+  }
+});
 
 app.post("/api/user/identify", async (req, res) => {
   const { uid } = req.body;
@@ -203,6 +248,114 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
+app.get("/api/user/profile", async (req, res) => {
+  const uid = req.query.uid;
+
+  if (typeof uid !== "string" || uid.length < 5 || uid.length > 80) {
+    return res.status(400).json({ error: "Invalid uid" });
+  }
+
+  try {
+    const acc = await db.query(
+      "SELECT username FROM accounts WHERE uid = $1",
+      [uid]
+    );
+
+    const sess = await db.query(
+      `
+      SELECT started_at, wpm, accuracy
+      FROM sessions
+      WHERE uid = $1 AND ended_at IS NOT NULL
+      ORDER BY started_at ASC
+      LIMIT 200
+      `,
+      [uid]
+    );
+
+    const pr = await db.query(
+      "SELECT weak_bigrams, avg_wpm, avg_accuracy FROM profiles WHERE uid = $1",
+      [uid]
+    );
+
+    let weak = pr.rowCount ? pr.rows[0].weak_bigrams : {};
+    if (typeof weak === "string") {
+      try { weak = JSON.parse(weak); } catch { weak = {}; }
+    }
+    if (!weak || typeof weak !== "object") weak = {};
+
+    const weakBigramsTop = Object.entries(weak)
+      .sort((a, b) => Number(b[1]) - Number(a[1]))
+      .slice(0, 12)
+      .map(([bg, errors]) => ({ bg, errors: Number(errors) }));
+
+    const cfg = await db.query(
+      "SELECT personalization_strength, stress_mode FROM admin_config WHERE id = 1"
+    );
+
+    let personalizationStrength = 70;
+    let stressMode = false;
+    if (cfg.rowCount > 0) {
+      personalizationStrength = Number(cfg.rows[0].personalization_strength);
+      stressMode = Boolean(cfg.rows[0].stress_mode);
+    }
+
+    const mode =
+      (personalizationStrength <= 30 && !stressMode) ? "easy" :
+      (personalizationStrength >= 90 && stressMode) ? "hard" :
+      (personalizationStrength >= 60 && personalizationStrength <= 80 && !stressMode) ? "normal" :
+      "custom";
+
+    return res.json({
+      uid,
+      username: acc.rowCount ? acc.rows[0].username : null,
+      mode,
+      sessions: sess.rows,
+      weakBigramsTop,
+      avgWpm: pr.rowCount ? Number(pr.rows[0].avg_wpm || 0) : 0,
+      avgAccuracy: pr.rowCount ? Number(pr.rows[0].avg_accuracy || 0) : 0
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "DB error" });
+  }
+});
+
+
+app.delete("/api/admin/users/:uid", requireAdmin, async (req, res) => {
+  const uid = req.params.uid;
+
+  if (typeof uid !== "string" || uid.length < 5 || uid.length > 80) {
+    return res.status(400).json({ error: "Invalid uid" });
+  }
+
+  try {
+    const r = await db.query("DELETE FROM users WHERE uid = $1 RETURNING uid", [uid]);
+    if (r.rowCount === 0) return res.status(404).json({ error: "User not found" });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "DB error" });
+  }
+});
+
+app.delete("/api/admin/users/:uid", requireAdmin, async (req, res) => {
+  const uid = req.params.uid;
+
+  if (typeof uid !== "string" || uid.length < 5 || uid.length > 80) {
+    return res.status(400).json({ error: "Invalid uid" });
+  }
+
+  try {
+    const r = await db.query("DELETE FROM users WHERE uid = $1 RETURNING uid", [uid]);
+    if (r.rowCount === 0) return res.status(404).json({ error: "User not found" });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "DB error" });
+  }
+});
+
+
 app.post("/api/auth/login", async (req, res) => {
   const { username, password } = req.body;
 
@@ -276,52 +429,92 @@ app.get("/api/text/next", async (req, res) => {
   }
 
   try {
-   await db.query(
-  "INSERT INTO users (uid) VALUES ($1) ON CONFLICT (uid) DO NOTHING",
-  [uid]
-);
+  await db.query(
+    "INSERT INTO users (uid) VALUES ($1) ON CONFLICT (uid) DO NOTHING",
+    [uid]
+  );
 
-const pr = await db.query("SELECT weak_bigrams FROM profiles WHERE uid = $1", [uid]);
-let weak = pr.rowCount ? pr.rows[0].weak_bigrams : {};
-if (typeof weak === "string") {
-  try { weak = JSON.parse(weak); } catch { weak = {}; }
-}
-if (!weak || typeof weak !== "object") weak = {};
+  const cfg = await db.query(
+    "SELECT personalization_strength, stress_mode FROM admin_config WHERE id = 1"
+  );
 
-const all = await db.query("SELECT id, text FROM texts");
-if (all.rowCount === 0) return res.status(500).json({ error: "No texts" });
+  let personalizationStrength = 70;
+  let stressMode = false;
 
-function bigramSet(str) {
-  const s = String(str || "").toLowerCase();
-  const set = new Set();
-  for (let i = 0; i < s.length - 1; i++) set.add(s[i] + s[i + 1]);
-  return set;
-}
-
-const scored = all.rows.map((t) => {
-  const set = bigramSet(t.text);
-  let score = 0;
-  for (const [bg, count] of Object.entries(weak)) {
-    if (set.has(bg)) score += Number(count);
+  if (cfg.rowCount > 0) {
+    personalizationStrength = Number(cfg.rows[0].personalization_strength);
+    stressMode = Boolean(cfg.rows[0].stress_mode);
   }
-  return { id: t.id, text: t.text, score };
-});
 
-scored.sort((a, b) => b.score - a.score);
-
-let pick;
-if (scored[0].score === 0) {
-  pick = scored[Math.floor(Math.random() * scored.length)];
-} else {
-  const topN = scored.slice(0, Math.min(3, scored.length));
-  pick = topN[Math.floor(Math.random() * topN.length)];
-}
-
-return res.json({ textId: pick.id, text: pick.text });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "DB error" });
+  const pr = await db.query("SELECT weak_bigrams FROM profiles WHERE uid = $1", [uid]);
+  let weak = pr.rowCount ? pr.rows[0].weak_bigrams : {};
+  if (typeof weak === "string") {
+    try { weak = JSON.parse(weak); } catch { weak = {}; }
   }
+  if (!weak || typeof weak !== "object") weak = {};
+
+  const all = await db.query("SELECT id, text FROM texts");
+  if (all.rowCount === 0) return res.status(500).json({ error: "No texts" });
+
+  function bigramSet(str) {
+    const s = String(str || "").toLowerCase();
+    const set = new Set();
+    for (let i = 0; i < s.length - 1; i++) set.add(s[i] + s[i + 1]);
+    return set;
+  }
+
+  const scored = all.rows.map((t) => {
+    const set = bigramSet(t.text);
+    let profileScore = 0;
+
+    for (const [bg, count] of Object.entries(weak)) {
+      if (set.has(bg)) profileScore += Number(count);
+    }
+
+    const stressBonus = stressMode ? (String(t.text).length / 20) : 0;
+
+    return {
+      id: t.id,
+      text: t.text,
+      profileScore,
+      totalScore: profileScore + stressBonus,
+      length: String(t.text).length
+    };
+  });
+
+  function pickRandom() {
+    if (!stressMode) {
+      return scored[Math.floor(Math.random() * scored.length)];
+    }
+    const byLen = [...scored].sort((a, b) => b.length - a.length);
+    const topN = byLen.slice(0, Math.min(3, byLen.length));
+    return topN[Math.floor(Math.random() * topN.length)];
+  }
+
+  function pickWeighted() {
+    const byScore = [...scored].sort((a, b) => b.totalScore - a.totalScore);
+    if (byScore[0].totalScore <= 0) return pickRandom();
+    const topN = byScore.slice(0, Math.min(3, byScore.length));
+    return topN[Math.floor(Math.random() * topN.length)];
+  }
+
+  const useWeighted = Math.random() < (Math.max(0, Math.min(100, personalizationStrength)) / 100);
+
+  const pick = useWeighted ? pickWeighted() : pickRandom();
+
+  return res.json({
+    textId: pick.id,
+    text: pick.text,
+    meta: {
+      used: useWeighted ? "weighted" : "random",
+      personalizationStrength,
+      stressMode
+    }
+  });
+} catch (err) {
+  console.error(err);
+  return res.status(500).json({ error: "DB error" });
+}
 });
 
 app.post("/api/events/batch", async (req, res) => {
@@ -547,3 +740,5 @@ const weakBigramsTop = Object.entries(merged)
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+
