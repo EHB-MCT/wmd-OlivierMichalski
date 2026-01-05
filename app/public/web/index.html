@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Super Type Trainer</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Super Type Trainer</h1>
+      <a id="profileLink" href="admin/index.html" style="display:none">Admin Page</a>
+
+      <section class="card" id="profileAnon">
+      <p><strong>Profile:</strong> not logged in</p>
+      <p>Login to keep your stats and see your profile.</p>
+    </section>
+    
+    <section class="card" id="profileCard" style="display:none">
+      <p><strong>Your profile:</strong> <span id="uid">...</span></p>
+      <button id="regen">Refresh profile</button>
+    </section>
+
+      <section class="card">
+          <h2>Login</h2>
+          <label>Username</label>
+          <input id="username" type="text" placeholder="olive" />
+          <label>Password</label>
+            <input id="password" type="password" placeholder="pass123" />
+        <div style="margin-top: 10px;">
+          <button id="registerBtn">Register</button>
+          <button id="loginBtn">Login</button>
+       <button id="logoutBtn" style="display:none">Logout</button>
+      </div>
+      <a id="profileLink" href="/profile.html" style="display:none">My Profile</a>
+      <p id="authStatus">-</p>
+  </section>
+
+      <section class="card">
+        <p>Status: <span id="status">loading...</span></p>
+      </section>
+    
+    <section class="card">
+  <p><strong>Session:</strong> <span id="session">none</span></p>
+  <button id="startSession">Start session</button>
+</section>
+
+<section class="card">
+  <p><strong>Selection:</strong> <span id="selectionMeta">-</span></p>
+  <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+  <button id="userModeAuto" type="button">Auto</button>
+  <button id="userModeEasy" type="button">Easy</button>
+  <button id="userModeNormal" type="button">Normal</button>
+  <button id="userModeHard" type="button">Hard</button>
+  <span style="opacity:.8;">Selected: <strong><span id="userModeLabel">auto</span></strong></span>
+</div>
+  <p><strong>Current text:</strong></p>
+  <p id="currentText">loading...</p>
+</section>
+
+<section class="card">
+  <p><strong>Type here:</strong></p>
+
+  <div id="typeBox" class="typeBox">
+    <div id="targetOverlay" class="typeLayer typeTarget"></div>
+    <div id="typedOverlay" class="typeLayer typeTyped" aria-hidden="true"></div>
+    <input id="typingInput" class="typeInput" type="text" autocomplete="off" spellcheck="false" />
+  </div>
+
+  <p>Events logged: <span id="eventCount">0</span></p>
+  <p>Last sync: <span id="syncStatus">-</span></p>
+</section>
+
+
+<section class="card">
+  <button id="finishSession">Finish session</button>
+  <p><strong>Result:</strong> <span id="result">-</span></p>
+  <p><strong>Weak letters:</strong> <span id="weakLetters">-</span></p>
+</section>
+
+    <script src="./app.js"></script>
+        </main>
+  </body>
+</html>
