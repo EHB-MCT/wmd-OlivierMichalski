@@ -64,7 +64,7 @@ Used throughout the project for debugging, fixes, and writing some backend logic
 
 Share link: chatgpt session is too long so i wont be able to share the link.
 
-Ill provide pictures instead
+Ill provide relevant pictures instead
 
 Olivier Michalski
 Development V
